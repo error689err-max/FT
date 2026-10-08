@@ -6,3 +6,8 @@ Family Tree SaaS
 - Keep business logic in /lib (pure functions, unit tested). API route handlers stay thin.
 - UI: clean, modern, mobile-friendly, light/dark mode, empty/loading/error states on every screen.
 - Ask before adding new dependencies. Keep files small. No placeholder TODOs.
+- 
+
+- Skip optional tasks marked with * (property-based tests) unless explicitly asked.
+- After each task group, stop and wait for user confirmation before proceeding.
+- Never run database migrations automatically; output SQL files only.
