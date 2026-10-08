@@ -1,1 +1,1 @@
-{"/_not-found/page":"/_not-found","/api/auth/logout/route":"/api/auth/logout","/api/auth/callback/route":"/api/auth/callback","/page":"/","/(auth)/login/page":"/login","/(protected)/dashboard/page":"/dashboard"}
+{"/_not-found/page":"/_not-found","/api/auth/callback/route":"/api/auth/callback","/api/auth/logout/route":"/api/auth/logout","/page":"/","/(auth)/login/page":"/login","/(protected)/people/page":"/people","/(protected)/dashboard/page":"/dashboard","/(protected)/stats/page":"/stats","/(protected)/tree/page":"/tree","/(protected)/related/page":"/related"}
