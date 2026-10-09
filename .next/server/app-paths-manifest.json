@@ -1,12 +1,18 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
+  "/api/people/[id]/children/route": "app/api/people/[id]/children/route.js",
+  "/api/people/[id]/parents/route": "app/api/people/[id]/parents/route.js",
+  "/api/people/route": "app/api/people/route.js",
+  "/api/people/[id]/partners/route": "app/api/people/[id]/partners/route.js",
+  "/api/people/[id]/route": "app/api/people/[id]/route.js",
   "/api/auth/callback/route": "app/api/auth/callback/route.js",
-  "/page": "app/page.js",
   "/api/auth/logout/route": "app/api/auth/logout/route.js",
+  "/page": "app/page.js",
   "/(protected)/related/page": "app/(protected)/related/page.js",
-  "/(protected)/stats/page": "app/(protected)/stats/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(protected)/tree/page": "app/(protected)/tree/page.js",
   "/(protected)/people/page": "app/(protected)/people/page.js",
-  "/(protected)/dashboard/page": "app/(protected)/dashboard/page.js"
+  "/(protected)/people/[id]/page": "app/(protected)/people/[id]/page.js",
+  "/(protected)/stats/page": "app/(protected)/stats/page.js",
+  "/(protected)/dashboard/page": "app/(protected)/dashboard/page.js",
+  "/(protected)/tree/page": "app/(protected)/tree/page.js"
 }

@@ -17,11 +17,12 @@ export function Sidebar({ user }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false)
 
   const navItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: '📊' },
+    { href: '/dashboard', label: 'Dashboard', icon: '🏠' },
     { href: '/people', label: 'People', icon: '👥' },
     { href: '/tree', label: 'Tree View', icon: '🌳' },
     { href: '/related', label: 'How Are We Related', icon: '🔗' },
     { href: '/stats', label: 'Statistics', icon: '📈' },
+    { href: '/settings', label: 'Settings', icon: '⚙️' },
   ]
 
   const isActive = (href: string) => pathname === href
