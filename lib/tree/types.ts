@@ -1,7 +1,7 @@
-import type { Node, Edge } from 'reactflow'
+import type { Node, Edge } from '@xyflow/react'
 import type { Person } from '@/types/person'
 
-export interface PersonNodeData {
+export interface PersonNodeData extends Record<string, unknown> {
   person: Person
   isDeceased: boolean
 }

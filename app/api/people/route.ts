@@ -8,30 +8,35 @@ type TreeMemberRow = Database['public']['Tables']['tree_member']['Row']
 type PersonInsert = Database['public']['Tables']['person']['Insert']
 type PersonRow = Database['public']['Tables']['person']['Row']
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
+  console.log('\n[GET /api/people] ─────────────────────────')
   try {
     const supabase = await createServerClientInstance()
     
-    // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
+    console.log('[GET /api/people] user:', user?.email ?? 'null', '| authError:', authError?.message ?? 'none')
+
     if (authError || !user) {
+      console.log('[GET /api/people] → 401 Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's tree
     const { data: treeMember, error: treeError } = await supabase
       .from('tree_member')
       .select('tree_id')
       .eq('user_id', user.id)
       .single() as { data: TreeMemberRow | null; error: any }
 
+    console.log('[GET /api/people] treeMember:', treeMember?.tree_id ?? 'null', '| treeError:', treeError?.message ?? 'none')
+
     if (treeError || !treeMember) {
+      console.log('[GET /api/people] → 404 No tree found')
       return NextResponse.json({ error: 'No tree found for user' }, { status: 404 })
     }
 
     const treeId = treeMember.tree_id
-
-    // Get query parameters
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || undefined
     const gender = searchParams.get('gender') || undefined
@@ -39,38 +44,39 @@ export async function GET(request: NextRequest) {
     const city = searchParams.get('city') || undefined
     const country = searchParams.get('country') || undefined
 
-    // Fetch people
-    const people = await getPeopleByTree(supabase, treeId, {
-      search,
-      gender,
-      isAlive,
-      city,
-      country,
-    })
+    console.log('[GET /api/people] filters:', { search, gender, isAlive, city, country })
+
+    const people = await getPeopleByTree(supabase, treeId, { search, gender, isAlive, city, country })
+    console.log('[GET /api/people] → 200 returned', people.length, 'people')
+    console.log('────────────────────────────────────────────\n')
 
     return NextResponse.json(people)
   } catch (error) {
-    console.error('Error fetching people:', error)
+    console.error('[GET /api/people] → 500', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
+  console.log('\n[POST /api/people] ────────────────────────')
   try {
     const supabase = await createServerClientInstance()
     
-    // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
+    console.log('[POST /api/people] user:', user?.email ?? 'null', '| authError:', authError?.message ?? 'none')
+
     if (authError || !user) {
+      console.log('[POST /api/people] → 401 Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's tree
     const { data: treeMember, error: treeError } = await supabase
       .from('tree_member')
       .select('tree_id, role')
       .eq('user_id', user.id)
       .single() as { data: TreeMemberRow | null; error: any }
+
+    console.log('[POST /api/people] treeMember:', JSON.stringify(treeMember), '| treeError:', treeError?.message ?? 'none')
 
     if (treeError || !treeMember) {
       return NextResponse.json({ error: 'No tree found for user' }, { status: 404 })

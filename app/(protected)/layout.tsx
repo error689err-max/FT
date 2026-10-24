@@ -1,7 +1,7 @@
 import type React from 'react'
 import { redirect } from 'next/navigation'
 import { createServerClientInstance } from '@/lib/supabase/server'
-import { Sidebar } from './components/sidebar'
+import { LayoutWrapper } from './components/layout-wrapper'
 
 export default async function ProtectedLayout({
   children,
@@ -19,15 +19,5 @@ export default async function ProtectedLayout({
     redirect('/login')
   }
 
-  return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-950">
-      {/* Sidebar */}
-      <Sidebar user={user} />
-
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">{children}</div>
-      </main>
-    </div>
-  )
+  return <LayoutWrapper user={user}>{children}</LayoutWrapper>
 }

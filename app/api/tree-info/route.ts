@@ -6,43 +6,47 @@ type TreeRow = Database['public']['Tables']['tree']['Row']
 type TreeMemberRow = Database['public']['Tables']['tree_member']['Row']
 
 export async function GET(_request: NextRequest) {
+  console.log('\n[GET /api/tree-info] ───────────────────────')
   try {
     const supabase = await createServerClientInstance()
 
-    // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
+    console.log('[GET /api/tree-info] user:', user?.email ?? 'null', '| authError:', authError?.message ?? 'none')
+
     if (authError || !user) {
+      console.log('[GET /api/tree-info] → 401 Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's tree membership
     const { data: treeMember, error: memberError } = await supabase
       .from('tree_member')
       .select('tree_id, role')
       .eq('user_id', user.id)
       .single() as { data: TreeMemberRow | null; error: any }
 
+    console.log('[GET /api/tree-info] treeMember:', JSON.stringify(treeMember), '| memberError:', memberError?.message ?? 'none')
+
     if (memberError || !treeMember) {
+      console.log('[GET /api/tree-info] → 404 No tree found')
       return NextResponse.json({ error: 'No tree found for user' }, { status: 404 })
     }
 
-    // Get tree details
     const { data: tree, error: treeError } = await supabase
       .from('tree')
       .select('*')
       .eq('id', treeMember.tree_id)
       .single() as { data: TreeRow | null; error: any }
 
+    console.log('[GET /api/tree-info] tree:', tree?.id ?? 'null', tree?.name ?? '', '| treeError:', treeError?.message ?? 'none')
+    console.log('────────────────────────────────────────────\n')
+
     if (treeError || !tree) {
       return NextResponse.json({ error: 'Tree not found' }, { status: 404 })
     }
 
-    return NextResponse.json({
-      tree,
-      treeMember,
-    })
+    return NextResponse.json({ tree, treeMember })
   } catch (error) {
-    console.error('Error fetching tree info:', error)
+    console.error('[GET /api/tree-info] → 500', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,21 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClientInstance } from '@/lib/supabase/server'
-import { getPersonById } from '@/lib/db/queries'
+import {
+  getPeopleByTree,
+  getAllParentChildRelationships,
+  getAllPartnerships,
+} from '@/lib/db/queries'
+import { buildFamilyGraph, computeRelationship } from '@/lib/relationships/calculator'
 import type { Database } from '@/types/database'
+import type { Person } from '@/types/person'
 
 type TreeMemberRow = Database['public']['Tables']['tree_member']['Row']
+type PersonRow = Database['public']['Tables']['person']['Row']
+
+function dbPersonToDomain(p: PersonRow): Person {
+  return {
+    id: p.id,
+    treeId: p.tree_id,
+    fullName: p.full_name,
+    gender: p.gender as Person['gender'],
+    birthDate: p.birth_date ? new Date(p.birth_date) : null,
+    deathDate: p.death_date ? new Date(p.death_date) : null,
+    isAlive: p.is_alive,
+    city: p.city,
+    country: p.country,
+    notes: p.notes,
+    createdAt: new Date(p.created_at),
+    updatedAt: new Date(p.updated_at),
+  }
+}
+
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClientInstance()
 
-    // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's tree
     const { data: treeMember, error: treeError } = await supabase
       .from('tree_member')
       .select('tree_id')
@@ -26,35 +50,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No tree found for user' }, { status: 404 })
     }
 
-    const member = treeMember
-
-    // Parse request body
     const body = await request.json()
     const { person1Id, person2Id } = body
 
     if (!person1Id || !person2Id) {
-      return NextResponse.json(
-        { error: 'person1Id and person2Id are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'person1Id and person2Id are required' }, { status: 400 })
     }
 
-    // Fetch both people
-    const [person1, person2] = await Promise.all([
-      getPersonById(supabase, member.tree_id, person1Id),
-      getPersonById(supabase, member.tree_id, person2Id),
+    const [rawPeople, parentChild, partnerships] = await Promise.all([
+      getPeopleByTree(supabase, treeMember.tree_id),
+      getAllParentChildRelationships(supabase, treeMember.tree_id),
+      getAllPartnerships(supabase, treeMember.tree_id),
     ])
+
+    const people = rawPeople.map(dbPersonToDomain)
+    const graph = buildFamilyGraph(people, parentChild, partnerships)
+
+    const person1 = people.find(p => p.id === person1Id)
+    const person2 = people.find(p => p.id === person2Id)
 
     if (!person1 || !person2) {
       return NextResponse.json({ error: 'One or both people not found' }, { status: 404 })
     }
 
-    // For now, return a simple message
-    // TODO: Implement full relationship calculation using computeRelationship
+    const result = computeRelationship(person1Id, person2Id, graph)
+
     return NextResponse.json({
-      relationship: 'Relation being calculated',
-      person1: { id: person1.id, name: person1.full_name },
-      person2: { id: person2.id, name: person2.full_name },
+      relationship: result.label,
+      type: result.type,
+      distance: result.distance,
+      person1: { id: person1.id, name: person1.fullName },
+      person2: { id: person2.id, name: person2.fullName },
     })
   } catch (error) {
     console.error('Error analyzing relationship:', error)

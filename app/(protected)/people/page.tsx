@@ -1,34 +1,33 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { SearchAndFilter } from './components/search-filter'
-import { PersonTable } from './components/person-table'
+import { Users, Plus, LayoutGrid, List, Search, Filter, X, RefreshCw } from 'lucide-react'
 import { PersonForm } from './components/person-form'
+import { PersonTable } from './components/person-table'
+import { PersonGrid } from './components/person-grid'
 import type { Database } from '@/types/database'
 import type { PersonFilters, PersonInput } from '@/types/person'
 
 type PersonRow = Database['public']['Tables']['person']['Row']
+type ViewMode = 'table' | 'grid'
 
 export default function PeoplePage() {
   const [people, setPeople] = useState<PersonRow[]>([])
-  const [filteredPeople, setFilteredPeople] = useState<PersonRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-  // Form state
+  const [viewMode, setViewMode] = useState<ViewMode>('table')
+
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingPerson, setEditingPerson] = useState<PersonRow | null>(null)
-  
-  // Filter state
+
   const [searchQuery, setSearchQuery] = useState('')
   const [filters, setFilters] = useState<PersonFilters>({})
+  const [showFilters, setShowFilters] = useState(false)
 
-  // Fetch people from API
   const fetchPeople = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
-
       const params = new URLSearchParams()
       if (searchQuery) params.set('search', searchQuery)
       if (filters.gender) params.set('gender', filters.gender)
@@ -36,172 +35,254 @@ export default function PeoplePage() {
       if (filters.city) params.set('city', filters.city)
       if (filters.country) params.set('country', filters.country)
 
-      const response = await fetch(`/api/people?${params}`)
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to fetch people')
+      const res = await fetch(`/api/people?${params}`)
+      if (!res.ok) {
+        const e = await res.json()
+        throw new Error(e.error || 'Failed to fetch people')
       }
-
-      const data = await response.json()
-      setPeople(data)
-      setFilteredPeople(data)
+      setPeople(await res.json())
     } catch (err: any) {
       setError(err.message)
       setPeople([])
-      setFilteredPeople([])
     } finally {
       setIsLoading(false)
     }
   }, [searchQuery, filters])
 
-  // Fetch people on component mount and when filters change
-  useEffect(() => {
-    fetchPeople()
-  }, [fetchPeople])
+  useEffect(() => { fetchPeople() }, [fetchPeople])
 
-  // Handle search change
-  const handleSearchChange = useCallback((query: string) => {
-    setSearchQuery(query)
-  }, [])
-
-  // Handle filter change
-  const handleFilterChange = useCallback((newFilters: PersonFilters) => {
-    setFilters(newFilters)
-  }, [])
-
-  // Handle form submission
   const handleFormSubmit = async (data: PersonInput) => {
-    try {
-      const url = editingPerson ? `/api/people/${editingPerson.id}` : '/api/people'
-      const method = editingPerson ? 'PATCH' : 'POST'
+    const url = editingPerson ? `/api/people/${editingPerson.id}` : '/api/people'
+    const method = editingPerson ? 'PATCH' : 'POST'
 
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        if (response.status === 409) {
-          // Duplicate name - ask for confirmation
-          const confirm = window.confirm(errorData.message + '\n\nDo you want to add this person anyway?')
-          if (confirm) {
-            const retryResponse = await fetch(url, {
-              method,
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ...data, checkDuplicates: false }),
-            })
-            if (!retryResponse.ok) {
-              const retryErrorData = await retryResponse.json()
-              throw new Error(retryErrorData.error || 'Failed to save person')
-            }
-          } else {
-            return // User cancelled
+    if (!res.ok) {
+      const err = await res.json()
+      if (res.status === 409) {
+        const confirm = window.confirm(err.message + '\n\nAdd anyway?')
+        if (confirm) {
+          const retry = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...data, checkDuplicates: false }),
+          })
+          if (!retry.ok) {
+            const e = await retry.json()
+            throw new Error(e.error || 'Failed to save')
           }
-        } else {
-          throw new Error(errorData.error || 'Failed to save person')
-        }
+        } else return
+      } else {
+        throw new Error(err.error || 'Failed to save')
       }
-
-      // Success - refresh the list and close form
-      await fetchPeople()
-      setIsFormOpen(false)
-      setEditingPerson(null)
-    } catch (error: any) {
-      throw new Error(error.message || 'An unexpected error occurred')
     }
-  }
 
-  // Handle edit
-  const handleEdit = (person: PersonRow) => {
-    setEditingPerson(person)
-    setIsFormOpen(true)
-  }
-
-  // Handle delete
-  const handleDelete = async (personId: string) => {
-    try {
-      const response = await fetch(`/api/people/${personId}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        if (response.status === 409) {
-          alert(errorData.message)
-          return
-        }
-        throw new Error(errorData.error || 'Failed to delete person')
-      }
-
-      // Success - refresh the list
-      await fetchPeople()
-    } catch (error: any) {
-      alert('Error deleting person: ' + error.message)
-    }
-  }
-
-  // Handle add new person
-  const handleAddNew = () => {
-    setEditingPerson(null)
-    setIsFormOpen(true)
-  }
-
-  // Handle form cancel
-  const handleFormCancel = () => {
+    await fetchPeople()
     setIsFormOpen(false)
     setEditingPerson(null)
   }
 
+  const handleDelete = async (personId: string) => {
+    const res = await fetch(`/api/people/${personId}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const e = await res.json()
+      if (res.status === 409) { alert(e.message); return }
+      alert('Delete failed: ' + (e.error || ''))
+      return
+    }
+    await fetchPeople()
+  }
+
+  const hasFilters = !!searchQuery || !!filters.gender || filters.isAlive !== undefined || !!filters.city || !!filters.country
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setFilters({})
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-          People
-        </h1>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+            <Users size={18} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">People</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {isLoading ? 'Loading…' : `${people.length} member${people.length !== 1 ? 's' : ''}`}
+            </p>
+          </div>
+        </div>
         <button
-          onClick={handleAddNew}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded font-medium"
+          onClick={() => { setEditingPerson(null); setIsFormOpen(true) }}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition shadow-sm"
         >
+          <Plus size={16} />
           Add Person
         </button>
       </div>
 
-      {/* Error Display */}
-      {error && (
-        <div className="p-4 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded">
-          <p className="text-red-700 dark:text-red-300">{error}</p>
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search people…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Filter toggle */}
+        <button
+          onClick={() => setShowFilters(v => !v)}
+          className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition ${
+            showFilters || hasFilters
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400'
+              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Filter size={15} />
+          Filters
+          {hasFilters && (
+            <span className="w-4 h-4 text-xs rounded-full bg-blue-600 text-white flex items-center justify-center">
+              !
+            </span>
+          )}
+        </button>
+
+        {/* Clear filters */}
+        {hasFilters && (
           <button
-            onClick={() => fetchPeople()}
-            className="mt-2 text-sm text-red-600 dark:text-red-400 hover:underline"
+            onClick={clearFilters}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:text-red-500 transition"
           >
-            Try again
+            <X size={14} />
+            Clear
           </button>
+        )}
+
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-lg p-1 bg-white dark:bg-slate-900 ml-auto">
+          <button
+            onClick={() => setViewMode('table')}
+            className={`p-1.5 rounded-md transition ${
+              viewMode === 'table' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100' : 'text-slate-400 hover:text-slate-600'
+            }`}
+            title="Table view"
+          >
+            <List size={15} />
+          </button>
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`p-1.5 rounded-md transition ${
+              viewMode === 'grid' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100' : 'text-slate-400 hover:text-slate-600'
+            }`}
+            title="Grid view"
+          >
+            <LayoutGrid size={15} />
+          </button>
+        </div>
+
+        <button
+          onClick={fetchPeople}
+          className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+          title="Refresh"
+        >
+          <RefreshCw size={15} />
+        </button>
+      </div>
+
+      {/* Filter panel */}
+      {showFilters && (
+        <div className="flex flex-wrap gap-3 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Gender</label>
+            <select
+              value={filters.gender ?? ''}
+              onChange={e => setFilters(f => ({ ...f, gender: e.target.value as any || undefined }))}
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All genders</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Status</label>
+            <select
+              value={filters.isAlive === undefined ? '' : String(filters.isAlive)}
+              onChange={e => setFilters(f => ({ ...f, isAlive: e.target.value === '' ? undefined : e.target.value === 'true' }))}
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All</option>
+              <option value="true">Living</option>
+              <option value="false">Deceased</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">City</label>
+            <input
+              type="text"
+              placeholder="Filter by city…"
+              value={filters.city ?? ''}
+              onChange={e => setFilters(f => ({ ...f, city: e.target.value || undefined }))}
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Country</label>
+            <input
+              type="text"
+              placeholder="Filter by country…"
+              value={filters.country ?? ''}
+              onChange={e => setFilters(f => ({ ...f, country: e.target.value || undefined }))}
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
       )}
 
-      {/* Search and Filters */}
-      <SearchAndFilter
-        onSearchChange={handleSearchChange}
-        onFilterChange={handleFilterChange}
-      />
+      {/* Error */}
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl">
+          <p className="text-sm text-red-700 dark:text-red-400 flex-1">{error}</p>
+          <button onClick={fetchPeople} className="text-sm text-red-600 hover:underline shrink-0">Retry</button>
+        </div>
+      )}
 
-      {/* People Table */}
-      <PersonTable
-        people={filteredPeople}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        isLoading={isLoading}
-      />
+      {/* Content */}
+      {viewMode === 'table' ? (
+        <PersonTable
+          people={people}
+          onEdit={p => { setEditingPerson(p); setIsFormOpen(true) }}
+          onDelete={handleDelete}
+          isLoading={isLoading}
+        />
+      ) : (
+        <PersonGrid
+          people={people}
+          onEdit={p => { setEditingPerson(p); setIsFormOpen(true) }}
+          onDelete={handleDelete}
+          isLoading={isLoading}
+        />
+      )}
 
-      {/* Person Form Modal */}
+      {/* Form modal */}
       <PersonForm
         person={editingPerson}
         onSubmit={handleFormSubmit}
-        onCancel={handleFormCancel}
+        onCancel={() => { setIsFormOpen(false); setEditingPerson(null) }}
         isOpen={isFormOpen}
         availablePeople={people}
       />

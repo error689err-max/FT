@@ -1,12 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { validateEmail, validatePassword } from '@/lib/validators/person'
 
 export function LoginForm() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') || '/dashboard'
 
@@ -56,8 +55,8 @@ export function LoginForm() {
         return
       }
 
-      // Redirect to dashboard or original destination
-      router.push(redirectTo)
+      // Full page navigation so server middleware picks up the new session cookie
+      window.location.href = redirectTo
     } catch (err) {
       setServerError('An unexpected error occurred')
       setIsLoading(false)

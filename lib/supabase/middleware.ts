@@ -1,13 +1,9 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import type { Database } from '@/types/database'
 
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
+  let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,27 +14,49 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options as CookieOptions)
-          })
+          // Write cookies to both the request and response
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
         },
       },
     }
   )
 
-  const user = await supabase.auth.getUser()
+  // IMPORTANT: do not add any logic between createServerClient and getUser()
+  // A simple mistake here will cause session issues.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  // Redirect to login if accessing protected routes without session
-  if (request.nextUrl.pathname.startsWith('/(protected)') && !user.data.user) {
+  const { pathname } = request.nextUrl
+
+  const isProtected =
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/people') ||
+    pathname.startsWith('/tree') ||
+    pathname.startsWith('/related') ||
+    pathname.startsWith('/stats') ||
+    pathname.startsWith('/settings')
+
+  if (isProtected && !user) {
     const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirectTo', request.nextUrl.pathname)
-    return NextResponse.redirect(loginUrl)
+    loginUrl.searchParams.set('redirectTo', pathname)
+    const redirectResponse = NextResponse.redirect(loginUrl)
+    // Copy cookies to redirect response so session state is preserved
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value)
+    })
+    return redirectResponse
   }
 
-  // Redirect to dashboard if already logged in and accessing root
-  if (request.nextUrl.pathname === '/' && user.data.user) {
+  if ((pathname === '/' || pathname === '/login') && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  return response
+  return supabaseResponse
 }
